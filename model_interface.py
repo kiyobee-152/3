@@ -235,7 +235,14 @@ class BaseDetector(ABC):
 class YOLOv5ONNXDetector(BaseDetector):
     """YOLOv5 ONNX模型检测器"""
     
-    def __init__(self, weights: str, names: Optional[List[str]] = None, conf_thres: float = 0.45, iou_thres: float = 0.45):
+    def __init__(
+        self,
+        weights: str,
+        names: Optional[List[str]] = None,
+        conf_thres: float = 0.45,
+        iou_thres: float = 0.45,
+        device_preference: str = 'auto'
+    ):
         # 调用父类构造函数，初始化 weights、names、confidence、iou、img_size
         super().__init__(weights, names, conf_thres, iou_thres)
         # ONNX Runtime 推理会话对象，在 load_model() 中初始化
@@ -246,6 +253,8 @@ class YOLOv5ONNXDetector(BaseDetector):
         self.output_name = None
         # 推理设备：'cuda'（GPU）或 'cpu'
         self.device = 'cpu'
+        # 设备偏好：'auto'（自动）/ 'cpu' / 'gpu'
+        self.device_preference = (device_preference or 'auto').lower()
         # 构造函数中直接调用 load_model()，确保实例化后模型即可使用
         self.load_model()
     
@@ -265,13 +274,27 @@ class YOLOv5ONNXDetector(BaseDetector):
         import torch
         
         # 检测当前环境是否支持 CUDA（NVIDIA GPU 加速）
-        cuda = torch.cuda.is_available()
-        self.device = 'cuda' if cuda else 'cpu'
-        # ONNX Runtime 的执行提供者（Provider）列表
-        # 如果有 GPU 则优先使用 CUDAExecutionProvider，否则仅使用 CPUExecutionProvider
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if cuda else ['CPUExecutionProvider']
+        cuda_available = torch.cuda.is_available()
+        available_providers = onnxruntime.get_available_providers()
+        cuda_provider_available = 'CUDAExecutionProvider' in available_providers
+        gpu_available = cuda_available and cuda_provider_available
+
+        if self.device_preference == 'gpu':
+            if gpu_available:
+                self.device = 'cuda'
+                providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            else:
+                print("⚠️ 选择了 GPU，但当前环境不可用，已自动回退到 CPU")
+                self.device = 'cpu'
+                providers = ['CPUExecutionProvider']
+        elif self.device_preference == 'cpu':
+            self.device = 'cpu'
+            providers = ['CPUExecutionProvider']
+        else:
+            self.device = 'cuda' if gpu_available else 'cpu'
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if gpu_available else ['CPUExecutionProvider']
         
-        print(f'正在加载ONNX模型: {self.weights}')
+        print(f'正在加载ONNX模型: {self.weights}，设备: {"GPU" if self.device == "cuda" else "CPU"}')
         # 创建 ONNX Runtime 推理会话，加载模型权重
         self.sess = onnxruntime.InferenceSession(self.weights, providers=providers)
         # 获取模型定义的输出节点名称（YOLOv5 通常只有一个输出）
