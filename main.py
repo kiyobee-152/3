@@ -73,6 +73,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.feed_last_summary = ['等待输入源'] * 8
         self.feed_last_alarm_dict = [None] * 8
         self.selected_feed_id = 0
+        self._is_restoring_config = False
 
         self._build_left_panel()
         self._build_grid_panel()
@@ -92,54 +93,61 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.cb_weights.setGeometry(QtCore.QRect(10, 38, 280, 26))
         self.cb_weights.currentIndexChanged.connect(self.cb_weights_changed)
 
+        self.label_device = QtWidgets.QLabel("推理设备", self.left_panel)
+        self.label_device.setGeometry(QtCore.QRect(10, 70, 120, 24))
+        self.cb_device = QtWidgets.QComboBox(self.left_panel)
+        self.cb_device.setGeometry(QtCore.QRect(10, 96, 280, 26))
+        self.cb_device.addItems(["GPU", "CPU"])
+        self.cb_device.currentIndexChanged.connect(self.device_changed)
+
         self.label_3 = QtWidgets.QLabel("置信度", self.left_panel)
-        self.label_3.setGeometry(QtCore.QRect(10, 72, 80, 24))
+        self.label_3.setGeometry(QtCore.QRect(10, 126, 80, 24))
         self.hs_conf = QtWidgets.QSlider(QtCore.Qt.Horizontal, self.left_panel)
-        self.hs_conf.setGeometry(QtCore.QRect(10, 98, 210, 18))
+        self.hs_conf.setGeometry(QtCore.QRect(10, 152, 210, 18))
         self.hs_conf.setRange(1, 100)
         self.hs_conf.setValue(45)
         self.hs_conf.valueChanged.connect(self.conf_change)
         self.dsb_conf = QtWidgets.QDoubleSpinBox(self.left_panel)
-        self.dsb_conf.setGeometry(QtCore.QRect(230, 94, 60, 26))
+        self.dsb_conf.setGeometry(QtCore.QRect(230, 148, 60, 26))
         self.dsb_conf.setRange(0.01, 1.0)
         self.dsb_conf.setSingleStep(0.01)
         self.dsb_conf.setValue(0.45)
         self.dsb_conf.valueChanged.connect(self.dsb_conf_change)
 
         self.label_4 = QtWidgets.QLabel("IOU", self.left_panel)
-        self.label_4.setGeometry(QtCore.QRect(10, 126, 80, 24))
+        self.label_4.setGeometry(QtCore.QRect(10, 180, 80, 24))
         self.hs_iou = QtWidgets.QSlider(QtCore.Qt.Horizontal, self.left_panel)
-        self.hs_iou.setGeometry(QtCore.QRect(10, 152, 210, 18))
+        self.hs_iou.setGeometry(QtCore.QRect(10, 206, 210, 18))
         self.hs_iou.setRange(1, 100)
         self.hs_iou.setValue(45)
         self.hs_iou.valueChanged.connect(self.iou_change)
         self.dsb_iou = QtWidgets.QDoubleSpinBox(self.left_panel)
-        self.dsb_iou.setGeometry(QtCore.QRect(230, 148, 60, 26))
+        self.dsb_iou.setGeometry(QtCore.QRect(230, 202, 60, 26))
         self.dsb_iou.setRange(0.01, 1.0)
         self.dsb_iou.setSingleStep(0.01)
         self.dsb_iou.setValue(0.45)
         self.dsb_iou.valueChanged.connect(self.dsb_iou_change)
 
         self.label_active = QtWidgets.QLabel("当前操作画面", self.left_panel)
-        self.label_active.setGeometry(QtCore.QRect(10, 182, 120, 24))
+        self.label_active.setGeometry(QtCore.QRect(10, 236, 120, 24))
         self.cb_active_feed = QtWidgets.QComboBox(self.left_panel)
-        self.cb_active_feed.setGeometry(QtCore.QRect(10, 208, 280, 26))
+        self.cb_active_feed.setGeometry(QtCore.QRect(10, 262, 280, 26))
         for i in range(8):
             self.cb_active_feed.addItem(f"画面{i + 1}")
         self.cb_active_feed.currentIndexChanged.connect(self._on_active_feed_changed)
 
         self.btn_start_all = QtWidgets.QPushButton("全部启动(视频/相机)", self.left_panel)
-        self.btn_start_all.setGeometry(QtCore.QRect(10, 244, 135, 28))
+        self.btn_start_all.setGeometry(QtCore.QRect(10, 298, 135, 28))
         self.btn_start_all.clicked.connect(self.start_all_running_feeds)
 
         self.btn_stop_all = QtWidgets.QPushButton("全部停止", self.left_panel)
-        self.btn_stop_all.setGeometry(QtCore.QRect(155, 244, 135, 28))
+        self.btn_stop_all.setGeometry(QtCore.QRect(155, 298, 135, 28))
         self.btn_stop_all.clicked.connect(self.stop_all_feeds)
 
         self.label_5 = QtWidgets.QLabel("结果统计", self.left_panel)
-        self.label_5.setGeometry(QtCore.QRect(10, 310, 120, 24))
+        self.label_5.setGeometry(QtCore.QRect(10, 354, 120, 24))
         self.le_res = QtWidgets.QTextEdit(self.left_panel)
-        self.le_res.setGeometry(QtCore.QRect(10, 338, 280, 320))
+        self.le_res.setGeometry(QtCore.QRect(10, 382, 280, 276))
 
         self.label_record_count = QtWidgets.QLabel("检测记录: 0 条", self.left_panel)
         self.label_record_count.setGeometry(QtCore.QRect(10, 664, 280, 22))
@@ -343,15 +351,15 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.statusbar.addWidget(self.ssl_show)
 
         self.lbl_fps = QLabel("FPS: 0.0")
-        self.lbl_fps.setFixedWidth(100)
+        self.lbl_fps.setFixedWidth(200)
         self.lbl_infer_time = QLabel("推理: 0ms")
-        self.lbl_infer_time.setFixedWidth(100)
+        self.lbl_infer_time.setFixedWidth(200)
         self.lbl_cpu = QLabel("CPU: 0%")
-        self.lbl_cpu.setFixedWidth(100)
+        self.lbl_cpu.setFixedWidth(200)
         self.lbl_mem = QLabel("内存: 0%")
-        self.lbl_mem.setFixedWidth(100)
+        self.lbl_mem.setFixedWidth(200)
         self.lbl_gpu = QLabel("GPU: 0%")
-        self.lbl_gpu.setFixedWidth(100)
+        self.lbl_gpu.setFixedWidth(200)
 
         self.statusbar.addWidget(self.lbl_fps)
         self.statusbar.addWidget(self.lbl_infer_time)
@@ -366,11 +374,11 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
     def init_all(self):
         self.signal.connect(self.set_res, QtCore.Qt.QueuedConnection)
         self.load_weights_to_list()
-        if self.cb_weights.count() > 0:
-            self.cb_weights_changed()
+        self._restore_config()
+        if self.cb_weights.count() > 0 and self.detector is None:
+            self.cb_weights_changed(show_fallback_dialog=False)
         self.beautify_left_panel()
         self.update_record_count()
-        self._restore_config()
 
     def set_active_feed(self, feed_id):
         self.cb_active_feed.setCurrentIndex(feed_id)
@@ -379,7 +387,7 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.selected_feed_id = idx
         self.refresh_result_for_feed(idx)
 
-    def cb_weights_changed(self):
+    def cb_weights_changed(self, show_fallback_dialog=True):
         if self.cb_weights.currentText() == "":
             return
         
@@ -387,12 +395,17 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
         self.setWindowTitle('正在加载模型中..')
         try:
             weights_path = os.path.join(self.weights_dir, self.cb_weights.currentText())
+            device_preference = self.cb_device.currentText().lower()
             self.detector = create_detector(weights_path, model_type='auto',
                                             conf_thres=self.dsb_conf.value(),
-                                            iou_thres=self.dsb_iou.value())
+                                            iou_thres=self.dsb_iou.value(),
+                                            device_preference=device_preference)
             self.setWindowTitle(title)
-            self.ssl_show.setText(f"模型加载成功: {self.cb_weights.currentText()}")
-            self.logger.info(f"模型加载成功: {self.cb_weights.currentText()}")
+            actual_device = "GPU" if getattr(self.detector, "device", "cpu") == "cuda" else "CPU"
+            self.ssl_show.setText(f"模型加载成功: {self.cb_weights.currentText()} ({actual_device})")
+            self.logger.info(f"模型加载成功: {self.cb_weights.currentText()}, 请求设备={device_preference.upper()}, 实际设备={actual_device}")
+            if show_fallback_dialog and device_preference == 'gpu' and actual_device != 'GPU':
+                QMessageBox.information(self, "提示", "当前环境不可用 GPU，已自动回退为 CPU。")
             self._save_config()
         except Exception as e:
             self.setWindowTitle(title)
@@ -838,9 +851,11 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
 
     def _restore_config(self):
         try:
+            self._is_restoring_config = True
             conf = self.config_manager.get('confidence', 0.45)
             iou = self.config_manager.get('iou', 0.45)
             weights = self.config_manager.get('weights', '')
+            device = self.config_manager.get('device', 'gpu')
             # 恢复每个 feed 的增强设置，支持向后兼容
             feed_enhancements = self.config_manager.get('feed_enhancements', [False] * 8)
             if not isinstance(feed_enhancements, list):
@@ -849,15 +864,24 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
             
             self.dsb_conf.setValue(conf)
             self.dsb_iou.setValue(iou)
+            if str(device).upper() in ['CPU', 'GPU']:
+                self.cb_device.blockSignals(True)
+                self.cb_device.setCurrentText(str(device).upper())
+                self.cb_device.blockSignals(False)
             for i, checked in enumerate(feed_enhancements):
                 self.feed_enhance_checkboxes[i].setChecked(bool(checked))
             
             if weights and weights in [self.cb_weights.itemText(i) for i in range(self.cb_weights.count())]:
+                self.cb_weights.blockSignals(True)
                 self.cb_weights.setCurrentText(weights)
+                self.cb_weights.blockSignals(False)
+                self.cb_weights_changed(show_fallback_dialog=False)
             
             self.logger.info("参数恢复成功")
         except Exception as e:
             self.logger.warning(f"参数恢复失败: {e}")
+        finally:
+            self._is_restoring_config = False
     
     def _save_config(self):
         try:
@@ -866,10 +890,16 @@ class Ui_MainWindow(QtWidgets.QMainWindow):
                 'confidence': self.dsb_conf.value(),
                 'iou': self.dsb_iou.value(),
                 'weights': self.cb_weights.currentText(),
+                'device': self.cb_device.currentText().lower(),
                 'feed_enhancements': [cb.isChecked() for cb in self.feed_enhance_checkboxes]
             })
         except Exception as e:
             self.logger.warning(f"参数保存失败: {e}")
+
+    def device_changed(self, _=None):
+        if self._is_restoring_config or self.cb_weights.currentText() == "":
+            return
+        self.cb_weights_changed()
     
     def _update_status_metrics(self):
         try:
