@@ -15,6 +15,7 @@ class ConfigManager:
         'confidence': 0.45,
         'iou': 0.45,
         'weights': '',
+        'device': 'gpu',
         'enhancement': False
     }
     
